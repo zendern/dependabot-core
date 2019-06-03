@@ -22,34 +22,32 @@ module Dependabot
         dependency_set = DependencySet.new
 
         terraform_files.each do |file|
-          modules = parsed_file(file).fetch("module", []).map(&:first)
-          modules.each do |name, details|
-            dependency_set << build_terraform_dependency(file, name, details)
+          modules = parsed_file(file).fetch("module", [])
+          modules.each do |mod|
+            dependency_set << build_terraform_dependency(file, mod)
           end
         end
 
-        terragrunt_files.each do |file|
-          modules = parsed_file(file).fetch("terragrunt", []).first || {}
-          modules = modules.fetch("terraform", [])
-          modules.each do |details|
-            next unless details["source"]
+        #terragrunt_files.each do |file|
+        #  modules = parsed_file(file).fetch("terragrunt", []).first || {}
+        #  modules = modules.fetch("terraform", [])
+        #  modules.each do |details|
+        #    next unless details["source"]
 
-            dependency_set << build_terragrunt_dependency(file, details)
-          end
-        end
+        #    dependency_set << build_terragrunt_dependency(file, details)
+        #  end
+        #end
 
         dependency_set.dependencies
       end
 
       private
 
-      def build_terraform_dependency(file, name, details)
-        details = details.first
-
-        source = source_from(details)
+      def build_terraform_dependency(file, mod)
+        source = source_from(mod)
         dep_name =
-          source[:type] == "registry" ? source[:module_identifier] : name
-        version_req = details["version"]&.strip
+          source[:type] == "registry" ? source[:module_identifier] : mod["name"]
+        version_req = mod["version"]&.strip
         version =
           if source[:type] == "git" then version_from_ref(source[:ref])
           elsif version_req&.match?(/^\d/) then version_req
@@ -222,7 +220,7 @@ module Dependabot
           SharedHelpers.in_a_temporary_directory do
             File.write("tmp.tf", file.content)
 
-            command = "#{terraform_parser_path} -reverse < tmp.tf"
+            command = "#{terraform_parser_path}"
             start = Time.now
             stdout, stderr, process = Open3.capture3(command)
             time_taken = Time.now - start
@@ -247,7 +245,7 @@ module Dependabot
 
       def terraform_parser_path
         helper_bin_dir = File.join(native_helpers_root, "terraform/bin")
-        Pathname.new(File.join(helper_bin_dir, "json2hcl")).cleanpath.to_path
+        Pathname.new(File.join(helper_bin_dir, "helper")).cleanpath.to_path
       end
 
       def native_helpers_root
