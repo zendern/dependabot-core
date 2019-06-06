@@ -3,37 +3,65 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 
-	"github.com/hashicorp/hcl2/gohcl"
-	"github.com/hashicorp/hcl2/hclparse"
+	"github.com/dependabot/dependabot-core/terraform/helpers/parser"
 )
 
-type terraformModule struct {
-	Name    string `hcl:"name,label" json:"name"`
-	Source  string `hcl:"source" json:"source"`
-	Version string `hcl:"version" json:"version"`
+type HelperParams struct {
+	Function string          `json:"function"`
+	Args     json.RawMessage `json:"args"`
 }
 
-type terraformFile struct {
-	Modules []terraformModule `hcl:"module,block" json:"module"`
+type Output struct {
+	Error  string      `json:"error,omitempty"`
+	Result interface{} `json:"result,omitempty"`
 }
 
 func main() {
-	parser := hclparse.NewParser()
-	parsedFile, diags := parser.ParseHCLFile("tmp.tf")
-	if diags.HasErrors() {
-		fmt.Println(diags.Error())
-		return
+	d := json.NewDecoder(os.Stdin)
+	helperParams := &HelperParams{}
+	if err := d.Decode(helperParams); err != nil {
+		abort(err)
 	}
 
-	var tfFile terraformFile
-	diags = gohcl.DecodeBody(parsedFile.Body, nil, &tfFile)
-	if diags.HasErrors() {
-		fmt.Println(diags.Error())
-		return
+	var (
+		funcOut interface{}
+		funcErr error
+	)
+	switch helperParams.Function {
+	case "parseDependencyFile":
+		var args parser.Args
+		parseArgs(helperParams.Args, &args)
+		funcOut, funcErr = parser.ParseDependencyFile(&args)
+	default:
+		abort(fmt.Errorf("Unrecognised function '%s'", helperParams.Function))
 	}
 
-	jsonEnc := json.NewEncoder(os.Stdout)
-	jsonEnc.Encode(tfFile)
+	if funcErr != nil {
+		abort(funcErr)
+	}
+
+	output(&Output{Result: funcOut})
+}
+
+func parseArgs(data []byte, args interface{}) {
+	if err := json.Unmarshal(data, args); err != nil {
+		abort(err)
+	}
+}
+
+func output(o *Output) {
+	bytes, jsonErr := json.Marshal(o)
+	if jsonErr != nil {
+		log.Fatal(jsonErr)
+	}
+
+	os.Stdout.Write(bytes)
+}
+
+func abort(err error) {
+	output(&Output{Error: err.Error()})
+	os.Exit(1)
 }
