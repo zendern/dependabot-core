@@ -9,10 +9,36 @@ module Functions
       @credentials = credentials
     end
 
+    def dependency_source_type
+      return "git" if dependency_source.is_a?(::Bundler::Source::Git)
+
+      if dependency_source.is_a?(::Bundler::Source::Rubygems)
+        remote = dependency_source.remotes.first
+
+        if remote.nil? || remote.to_s == "https://rubygems.org/"
+          "rubygems"
+        else
+          "private_registry"
+        end
+      else
+        "unknown"
+      end
+    end
+
     def dependency_source
       setup_bundler
 
-      serialize_bundler_source(specified_source || default_source)
+      specified_source || default_source
+    end
+
+    def private_registry_versions
+      setup_bundler
+
+      dependency_source.fetchers.flat_map do |fetcher|
+        fetcher.
+          specs_with_retry([dependency_name], dependency_source).
+          search_all(dependency_name)
+      end.map(&:version)
     end
 
     private

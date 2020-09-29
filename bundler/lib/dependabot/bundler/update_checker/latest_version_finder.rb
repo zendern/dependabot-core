@@ -101,14 +101,10 @@ module Dependabot
         def registry_versions
           return rubygems_versions if dependency.name == "bundler"
           return rubygems_versions unless gemfile
+          return [] if dependency_source_type == "unknown"
+          return private_registry_versions if dependency_source_type == "private"
 
-          return [] unless dependency_source.is_a?(::Bundler::Source::Rubygems)
-
-          remote = dependency_source.remotes.first
-          return rubygems_versions if remote.nil?
-          return rubygems_versions if remote.to_s == "https://rubygems.org/"
-
-          private_registry_versions
+          rubygems_versions
         end
 
         def rubygems_versions
@@ -137,6 +133,22 @@ module Dependabot
                     search_all(dependency.name)
                 end.
                 map(&:version)
+            end
+        end
+
+        def native_private_registry_versions
+          @native_private_registry_versions ||=
+            in_a_native_bundler_context do |tmp_dir|
+              SharedHelpers.run_helper_subprocess(
+                command: NativeHelpers.helper_path,
+                function: "private_registry_versions",
+                args: {
+                  dir: tmp_dir,
+                  gemfile_name: gemfile.name,
+                  dependency_name: dependency.name,
+                  credentials: credentials,
+                }
+              )
             end
         end
 
@@ -194,14 +206,14 @@ module Dependabot
             end
         end
 
-        def native_dependency_source
-          return @native_dependency_source if defined?(@native_dependency_source)
+        def dependency_source_type
+          return @dependency_source_type if defined?(@dependency_source_type)
 
-          @native_dependency_source =
+          @dependency_source_type =
             in_a_native_bundler_context do |tmp_dir|
-              source_attributes = SharedHelpers.run_helper_subprocess(
+              SharedHelpers.run_helper_subprocess(
                 command: NativeHelpers.helper_path,
-                function: "dependency_source",
+                function: "dependency_source_type",
                 args: {
                   dir: tmp_dir,
                   gemfile_name: gemfile.name,
@@ -209,8 +221,6 @@ module Dependabot
                   credentials: credentials,
                 }
               )
-
-              OpenStruct.new(source_attributes)
             end
         end
 

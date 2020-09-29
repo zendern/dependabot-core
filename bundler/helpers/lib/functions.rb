@@ -31,12 +31,23 @@ module Functions
     ).run
   end
 
-  def self.dependency_source(gemfile_name:, dependency_name:, dir:, credentials:)
+  def self.dependency_source_type(gemfile_name:, dependency_name:, dir:,
+                                  credentials:)
     VersionFinder.new(
       gemfile_name: gemfile_name,
       dependency_name: dependency_name,
       dir: dir,
       credentials: credentials
-    ).dependency_source
+    ).dependency_source_type
+  end
+
+  def self.private_registry_versions(gemfile_name:, dependency_name:, dir:,
+                                     credentials:)
+    VersionFinder.new(
+      gemfile_name: gemfile_name,
+      dependency_name: dependency_name,
+      dir: dir,
+      credentials: credentials
+    ).private_registry_versions
   end
 end
