@@ -29,4 +29,36 @@ module Functions
       dependencies: dependencies,
     ).run
   end
+
+  def self.dependency_source(gemfile_name:, dependency_name:, dir:, credentials:)
+    ::Bundler.instance_variable_set(:@root, dir)
+
+    # TODO: DRY out this setup with Functions::LockfileUpdater
+    credentials.each do |cred|
+      token = cred["token"] ||
+              "#{cred['username']}:#{cred['password']}"
+
+      ::Bundler.settings.set_command_option(
+        cred.fetch("host"),
+        token.gsub("@", "%40F").gsub("?", "%3F")
+      )
+    end
+
+    definition = ::Bundler::Definition.build(gemfile_name, nil, {})
+
+    specified_source =
+      definition.dependencies.
+      find { |dep| dep.name == dependency_name }&.source
+
+    dependency_source = specified_source ||
+      definition.send(:sources).default_source
+
+    serialize_bundler_source(dependency_source)
+  end
+
+  def self.serialize_bundler_source(source)
+    {
+      type: source.class.to_s
+    }
+  end
 end

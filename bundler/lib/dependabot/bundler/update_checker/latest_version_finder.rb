@@ -11,12 +11,17 @@ require "dependabot/bundler/requirement"
 require "dependabot/shared_helpers"
 require "dependabot/errors"
 
+require "ostruct"
+
 module Dependabot
   module Bundler
     class UpdateChecker
       class LatestVersionFinder
         require_relative "shared_bundler_helpers"
         include SharedBundlerHelpers
+
+        BUNDLER_SOURCE_GIT = "Bundler::Source::Git"
+        BUNDLER_SOURCE_RUBYGEMS = "Bundler::Source::Rubygems"
 
         def initialize(dependency:, dependency_files:, repo_contents_path: nil,
                        credentials:, ignored_versions:, raise_on_ignored: false,
@@ -44,7 +49,7 @@ module Dependabot
                     :credentials, :ignored_versions, :security_advisories
 
         def fetch_latest_version_details
-          if dependency_source.is_a?(::Bundler::Source::Git)
+          if native_dependency_source&.type == BUNDLER_SOURCE_GIT
             return latest_git_version_details
           end
 
@@ -56,7 +61,7 @@ module Dependabot
         end
 
         def fetch_lowest_security_fix_version
-          return if dependency_source.is_a?(::Bundler::Source::Git)
+          return if native_dependency_source&.type == BUNDLER_SOURCE_GIT
 
           relevant_versions = registry_versions
           relevant_versions = filter_prerelease_versions(relevant_versions)
@@ -95,8 +100,8 @@ module Dependabot
 
         def registry_versions
           return rubygems_versions if dependency.name == "bundler"
-          return rubygems_versions unless dependency_source
-          return [] unless dependency_source.is_a?(::Bundler::Source::Rubygems)
+          return rubygems_versions unless native_dependency_source
+          return [] unless native_dependency_source.type = BUNDLER_SOURCE_RUBYGEMS
 
           remote = dependency_source.remotes.first
           return rubygems_versions if remote.nil?
@@ -175,8 +180,9 @@ module Dependabot
 
         def dependency_source
           return nil unless gemfile
+          return @dependency_source if defined?(@dependency_source)
 
-          @dependency_source ||=
+          @dependency_source =
             in_a_temporary_bundler_context do
               definition = ::Bundler::Definition.build(gemfile.name, nil, {})
 
@@ -185,6 +191,29 @@ module Dependabot
                 find { |dep| dep.name == dependency.name }&.source
 
               specified_source || definition.send(:sources).default_source
+            end
+        end
+
+        def native_dependency_source
+          return nil unless gemfile
+          return @native_dependency_source if defined?(@native_dependency_source)
+
+          @native_dependency_source =
+            in_a_native_bundler_context do |tmp_dir|
+              write_temporary_dependency_files
+
+              source_attributes = SharedHelpers.run_helper_subprocess(
+                command: NativeHelpers.helper_path,
+                function: "dependency_source",
+                args: {
+                  dir: tmp_dir,
+                  gemfile_name: gemfile.name,
+                  dependency_name: dependency.name,
+                  credentials: credentials,
+                }
+              )
+
+              OpenStruct.new(source_attributes)
             end
         end
 
