@@ -49,7 +49,7 @@ module Dependabot
                     :credentials, :ignored_versions, :security_advisories
 
         def fetch_latest_version_details
-          if native_dependency_source&.type == BUNDLER_SOURCE_GIT
+          if dependency_source.is_a?(::Bundler::Source::Git)
             return latest_git_version_details
           end
 
@@ -61,7 +61,7 @@ module Dependabot
         end
 
         def fetch_lowest_security_fix_version
-          return if native_dependency_source&.type == BUNDLER_SOURCE_GIT
+          return if dependency_source.is_a?(::Bundler::Source::Git)
 
           relevant_versions = registry_versions
           relevant_versions = filter_prerelease_versions(relevant_versions)
@@ -100,8 +100,8 @@ module Dependabot
 
         def registry_versions
           return rubygems_versions if dependency.name == "bundler"
-          return rubygems_versions unless native_dependency_source
-          return [] unless native_dependency_source.type = BUNDLER_SOURCE_RUBYGEMS
+          return rubygems_versions unless dependency_source
+          return [] unless dependency_source.is_a?(::Bundler::Source::Rubygems)
 
           remote = dependency_source.remotes.first
           return rubygems_versions if remote.nil?
