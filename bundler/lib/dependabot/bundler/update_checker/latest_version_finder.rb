@@ -100,7 +100,8 @@ module Dependabot
 
         def registry_versions
           return rubygems_versions if dependency.name == "bundler"
-          return rubygems_versions unless dependency_source
+          return rubygems_versions unless gemfile
+
           return [] unless dependency_source.is_a?(::Bundler::Source::Rubygems)
 
           remote = dependency_source.remotes.first
@@ -179,7 +180,6 @@ module Dependabot
         end
 
         def dependency_source
-          return nil unless gemfile
           return @dependency_source if defined?(@dependency_source)
 
           @dependency_source =
@@ -195,13 +195,10 @@ module Dependabot
         end
 
         def native_dependency_source
-          return nil unless gemfile
           return @native_dependency_source if defined?(@native_dependency_source)
 
           @native_dependency_source =
             in_a_native_bundler_context do |tmp_dir|
-              write_temporary_dependency_files
-
               source_attributes = SharedHelpers.run_helper_subprocess(
                 command: NativeHelpers.helper_path,
                 function: "dependency_source",
