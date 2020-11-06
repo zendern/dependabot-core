@@ -46,11 +46,13 @@ module Dependabot
           /x.freeze
 
         def initialize(dependency:, credentials:, dependency_files:,
-                       latest_allowable_version:, latest_version_finder:)
+                       latest_allowable_version:, latest_version_finder:,
+                       options:)
           @dependency               = dependency
           @credentials              = credentials
           @dependency_files         = dependency_files
           @latest_allowable_version = latest_allowable_version
+          @options = options
 
           @latest_version_finder = {}
           @latest_version_finder[dependency] = latest_version_finder
@@ -113,7 +115,7 @@ module Dependabot
         private
 
         attr_reader :dependency, :credentials, :dependency_files,
-                    :latest_allowable_version
+                    :latest_allowable_version, :options
 
         def latest_version_finder(dep)
           @latest_version_finder[dep] ||=
@@ -128,7 +130,11 @@ module Dependabot
 
         # rubocop:disable Metrics/PerceivedComplexity
         def resolve_latest_previous_version(dep, updated_version)
-          return dep.version if dep.version
+          if options[:check_all_dependency_versions]
+            return dep.all_versions.last
+          else
+            return dep.version if dep.version
+          end
 
           @resolve_latest_previous_version ||= {}
           @resolve_latest_previous_version[dep] ||= begin

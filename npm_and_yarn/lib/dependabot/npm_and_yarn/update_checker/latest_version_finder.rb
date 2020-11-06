@@ -22,13 +22,14 @@ module Dependabot
 
         def initialize(dependency:, credentials:, dependency_files:,
                        ignored_versions:, security_advisories:,
-                       raise_on_ignored: false)
+                       raise_on_ignored: false, options: {})
           @dependency          = dependency
           @credentials         = credentials
           @dependency_files    = dependency_files
           @ignored_versions    = ignored_versions
           @raise_on_ignored    = raise_on_ignored
           @security_advisories = security_advisories
+          @options = options
         end
 
         def latest_version_from_registry
@@ -100,7 +101,7 @@ module Dependabot
         private
 
         attr_reader :dependency, :credentials, :dependency_files,
-                    :ignored_versions, :security_advisories
+                    :ignored_versions, :security_advisories, :options
 
         def valid_npm_details?
           !npm_details&.fetch("dist-tags", nil).nil?
@@ -138,8 +139,16 @@ module Dependabot
         end
 
         def filter_lower_versions(versions_array)
-          versions_array.
-            select { |version| version > version_class.new(dependency.version) }
+          if options[:check_all_dependency_versions]
+            versions_array.select do |version|
+              dependency.all_versions.all? do |v|
+                version > version_class.new(v)
+              end
+            end
+          else
+            versions_array.
+              select { |version| version > version_class.new(dependency.version) }
+          end
         end
 
         def version_from_dist_tags

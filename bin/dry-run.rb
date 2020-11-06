@@ -376,7 +376,8 @@ def update_checker_for(dependency)
     repo_contents_path: $repo_contents_path,
     requirements_update_strategy: $options[:requirements_update_strategy],
     ignored_versions: ignore_conditions_for(dependency),
-    security_advisories: security_advisories
+    security_advisories: security_advisories,
+    options: $options[:updater_options]
   )
 end
 
@@ -455,7 +456,7 @@ puts "=> updating #{dependencies.count} dependencies"
 # rubocop:disable Metrics/BlockLength
 dependencies.each do |dep|
   checker = update_checker_for(dep)
-  name_version = "\n=== #{dep.name} (#{dep.version})"
+  name_version = "\n=== #{dep.name} (#{dep.all_versions.join(', ')})"
   vulnerable = checker.vulnerable? ? " (vulnerable 🚨)" : ""
   puts name_version + vulnerable
 

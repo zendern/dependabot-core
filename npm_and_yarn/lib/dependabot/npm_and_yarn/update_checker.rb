@@ -45,7 +45,10 @@ module Dependabot
         # Note: we currently don't resolve transitive/sub-dependencies as
         # npm/yarn don't provide any control over updating to a specific
         # sub-dependency
-        return latest_resolvable_version unless dependency.top_level?
+        unless dependency.top_level?
+          return subdependency_version_resolver.
+                 lowest_resolvable_security_fix_version
+        end
 
         # TODO: Might want to check resolvability here?
         lowest_security_fix_version
@@ -125,6 +128,7 @@ module Dependabot
           ).updated_requirements,
           previous_version: previous_version,
           previous_requirements: original_dep.requirements,
+          all_previous_versions: original_dep.all_versions,
           package_manager: original_dep.package_manager
         )
       end
@@ -207,7 +211,8 @@ module Dependabot
             dependency_files: dependency_files,
             ignored_versions: ignored_versions,
             raise_on_ignored: raise_on_ignored,
-            security_advisories: security_advisories
+            security_advisories: security_advisories,
+            options: options
           )
       end
 
@@ -218,7 +223,8 @@ module Dependabot
             credentials: credentials,
             dependency_files: dependency_files,
             latest_allowable_version: latest_version,
-            latest_version_finder: latest_version_finder
+            latest_version_finder: latest_version_finder,
+            options: options
           )
       end
 
@@ -229,7 +235,9 @@ module Dependabot
             credentials: credentials,
             dependency_files: dependency_files,
             ignored_versions: ignored_versions,
-            latest_allowable_version: latest_version
+            latest_allowable_version: latest_version,
+            security_advisories: security_advisories,
+            options: options
           )
       end
 

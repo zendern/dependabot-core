@@ -16,15 +16,18 @@ module Dependabot
     class UpdateChecker
       class SubdependencyVersionResolver
         def initialize(dependency:, credentials:, dependency_files:,
-                       ignored_versions:, latest_allowable_version:)
+                       ignored_versions:, latest_allowable_version:,
+                       security_advisories:, options:)
           @dependency = dependency
           @credentials = credentials
           @dependency_files = dependency_files
           @ignored_versions = ignored_versions
           @latest_allowable_version = latest_allowable_version
+          @security_advisories = security_advisories
+          @options = options
         end
 
-        def latest_resolvable_version
+        def latest_resolvable_version(security_fix: false)
           raise "Not a subdependency!" if dependency.requirements.any?
           return if bundled_dependency?
 
@@ -38,7 +41,8 @@ module Dependabot
               updated_lockfile
             end
 
-            version_from_updated_lockfiles(updated_lockfiles)
+            version_from_updated_lockfiles(updated_lockfiles,
+                                           security_fix: security_fix)
           end
         rescue SharedHelpers::HelperSubprocessFailed
           # TODO: Move error handling logic from the FileUpdater to this class
@@ -47,10 +51,15 @@ module Dependabot
           nil
         end
 
+        def lowest_resolvable_security_fix_version
+          latest_resolvable_version(security_fix: true)
+        end
+
         private
 
         attr_reader :dependency, :credentials, :dependency_files,
-                    :ignored_versions, :latest_allowable_version
+                    :ignored_versions, :latest_allowable_version,
+                    :security_advisories, :options
 
         def update_subdependency_in_lockfile(lockfile)
           lockfile_name = Pathname.new(lockfile.name).basename.to_s
@@ -65,21 +74,46 @@ module Dependabot
           updated_files.fetch(lockfile_name)
         end
 
-        def version_from_updated_lockfiles(updated_lockfiles)
+        def version_from_updated_lockfiles(updated_lockfiles, security_fix:)
           updated_files = dependency_files -
                           yarn_locks -
                           package_locks -
                           shrinkwraps +
                           updated_lockfiles
 
-          updated_version = NpmAndYarn::FileParser.new(
+          updated_dependency = NpmAndYarn::FileParser.new(
             dependency_files: updated_files,
             source: nil,
             credentials: credentials
-          ).parse.find { |d| d.name == dependency.name }&.version
-          return unless updated_version
+          ).parse.find { |d| d.name == dependency.name }
 
-          version_class.new(updated_version)
+          if options[:check_all_dependency_versions] && security_fix
+            updated_versions = updated_dependency&.all_versions
+            return unless updated_versions
+
+            vulnerable_versions = dependency.all_versions.select do |v|
+              version = version_class.new(v)
+              security_advisories.any? do |advisory|
+                advisory.vulnerable?(version)
+              end
+            end
+
+            if (updated_versions & vulnerable_versions).any?
+              return
+            end
+
+            changed_versions = updated_versions - dependency.all_versions
+            changed_versions = changed_versions.map do |v|
+              version_class.new(v)
+            end
+            # pick the lowest of the updated versions
+            changed_versions.sort.first
+          else
+            updated_version = updated_dependency&.version
+            return unless updated_version
+
+            version_class.new(updated_version)
+          end
         end
 
         def run_yarn_updater(path, lockfile_name)

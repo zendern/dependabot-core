@@ -76,12 +76,18 @@ module Dependabot
             (new_dep.subdependency_metadata || [])
           ).uniq
 
+          all_versions = [
+            new_dep.version,
+            *old_dep.all_versions
+          ].uniq
+
           Dependency.new(
             name: old_dep.name,
             version: new_version,
             requirements: (old_dep.requirements + new_dep.requirements).uniq,
             package_manager: package_manager,
-            subdependency_metadata: subdependency_metadata
+            subdependency_metadata: subdependency_metadata,
+            all_versions: all_versions,
           )
         end
       end

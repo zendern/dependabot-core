@@ -9,12 +9,13 @@ module Dependabot
     class Base
       attr_reader :dependency, :dependency_files, :repo_contents_path,
                   :credentials, :ignored_versions, :raise_on_ignored,
-                  :security_advisories, :requirements_update_strategy
+                  :security_advisories, :requirements_update_strategy,
+                  :options
 
       def initialize(dependency:, dependency_files:, repo_contents_path: nil,
                      credentials:, ignored_versions: [],
                      raise_on_ignored: false, security_advisories: [],
-                     requirements_update_strategy: nil)
+                     requirements_update_strategy: nil, options: {})
         @dependency = dependency
         @dependency_files = dependency_files
         @repo_contents_path = repo_contents_path
@@ -23,6 +24,7 @@ module Dependabot
         @ignored_versions = ignored_versions
         @raise_on_ignored = raise_on_ignored
         @security_advisories = security_advisories
+        @options = options
       end
 
       def up_to_date?
@@ -134,8 +136,17 @@ module Dependabot
         # Can't (currently) detect whether git dependencies are vulnerable
         return false if existing_version_is_sha?
 
-        version = version_class.new(dependency.version)
-        security_advisories.any? { |a| a.vulnerable?(version) }
+        if options[:check_all_dependency_versions]
+          versions = dependency.all_versions.map do |version|
+            version_class.new(version)
+          end
+          versions.any? do |version|
+            security_advisories.any? { |a| a.vulnerable?(version) }
+          end
+        else
+          version = version_class.new(dependency.version)
+          security_advisories.any? { |a| a.vulnerable?(version) }
+        end
       end
 
       private
@@ -154,6 +165,7 @@ module Dependabot
           requirements: dependency.requirements,
           previous_version: previous_version,
           previous_requirements: dependency.requirements,
+          all_previous_versions: dependency.all_versions,
           package_manager: dependency.package_manager
         )
       end
@@ -168,6 +180,7 @@ module Dependabot
           requirements: updated_requirements,
           previous_version: previous_version,
           previous_requirements: dependency.requirements,
+          all_previous_versions: dependency.all_versions,
           package_manager: dependency.package_manager
         )
       end

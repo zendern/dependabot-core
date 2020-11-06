@@ -52,6 +52,7 @@ module Dependabot
                 requirements: updated_requirements(dep),
                 previous_version: dep.version,
                 previous_requirements: dep.requirements,
+                all_previous_versions: dep.all_versions,
                 package_manager: dep.package_manager
               )
             end
