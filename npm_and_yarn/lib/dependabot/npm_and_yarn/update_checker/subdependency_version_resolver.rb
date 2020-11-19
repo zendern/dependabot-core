@@ -17,20 +17,35 @@ module Dependabot
     class UpdateChecker
       class SubdependencyVersionResolver
         def initialize(dependency:, credentials:, dependency_files:,
-                       ignored_versions:, latest_allowable_version:)
+                       ignored_versions:, latest_allowable_version:,
+                       options:)
           @dependency = dependency
           @credentials = credentials
           @dependency_files = dependency_files
           @ignored_versions = ignored_versions
           @latest_allowable_version = latest_allowable_version
+          @options = options
         end
 
         def latest_resolvable_version
           raise "Not a subdependency!" if dependency.requirements.any?
           return if bundled_dependency?
 
-          SharedHelpers.in_a_temporary_directory do
+          SharedHelpers.in_a_temporary_directory do |path|
             dependency_files_builder.write_temporary_dependency_files
+
+            if filtered_yarn_locks.none? && options[:use_arborist_resolver]
+              updated_version = SharedHelpers.with_git_configured(credentials: credentials) do
+                updated_dependency = dependency.to_h
+                updated_dependency[:target_version] = latest_allowable_version
+                SharedHelpers.run_helper_subprocess(
+                  command: NativeHelpers.helper_path,
+                  function: "npm:subdependencyVersionResolver",
+                  args: [Dir.pwd, [updated_dependency]]
+                )
+              end
+              return version_class.new(updated_version)
+            end
 
             updated_lockfiles = filtered_lockfiles.map do |lockfile|
               updated_content = update_subdependency_in_lockfile(lockfile)
@@ -51,7 +66,7 @@ module Dependabot
         private
 
         attr_reader :dependency, :credentials, :dependency_files,
-                    :ignored_versions, :latest_allowable_version
+                    :ignored_versions, :latest_allowable_version, :options
 
         def update_subdependency_in_lockfile(lockfile)
           lockfile_name = Pathname.new(lockfile.name).basename.to_s
@@ -139,6 +154,10 @@ module Dependabot
               dependency_files: dependency_files,
               updated_dependencies: [updated_dependency]
             ).files_requiring_update
+        end
+
+        def filtered_yarn_locks
+          filtered_lockfiles.select { |f| f.name.end_with?("yarn.lock") }
         end
 
         def dependency_files_builder
