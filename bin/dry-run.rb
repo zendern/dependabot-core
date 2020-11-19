@@ -376,7 +376,8 @@ def update_checker_for(dependency)
     repo_contents_path: $repo_contents_path,
     requirements_update_strategy: $options[:requirements_update_strategy],
     ignored_versions: ignore_conditions_for(dependency),
-    security_advisories: security_advisories
+    security_advisories: security_advisories,
+    options: $options[:updater_options]
   )
 end
 
