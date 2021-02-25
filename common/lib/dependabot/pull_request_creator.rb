@@ -209,7 +209,7 @@ module Dependabot
           pr_message_footer: pr_message_footer,
           vulnerabilities_fixed: vulnerabilities_fixed,
           github_redirection_service: github_redirection_service
-        )
+        ).message
     end
 
     def branch_namer
