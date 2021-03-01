@@ -16,7 +16,9 @@ helpers_dir="$(dirname "${BASH_SOURCE[0]}")"
 cp -r \
   "$helpers_dir/lib" \
   "$helpers_dir/monkey_patches" \
+  "$helpers_dir/spec" \
   "$helpers_dir/run.rb" \
+  "$helpers_dir/dependabot-bundler-v1-native-helpers.gemspec" \
   "$helpers_dir/Gemfile" \
   "$install_dir"
 
