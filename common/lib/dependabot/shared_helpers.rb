@@ -69,11 +69,9 @@ module Dependabot
     end
 
     # rubocop:disable Metrics/MethodLength
-    # rubocop:disable Metrics/PerceivedComplexity
     def self.run_helper_subprocess(command:, function:, args:, env: nil,
                                    stderr_to_stdout: false,
-                                   allow_unsafe_shell_command: false,
-                                   unsetenv_others: false)
+                                   allow_unsafe_shell_command: false)
       start = Time.now
       stdin_data = JSON.dump(function: function, args: args)
       cmd = allow_unsafe_shell_command ? command : escape_command(command)
@@ -127,7 +125,6 @@ module Dependabot
         error_context: error_context
       )
     end
-    # rubocop:enable Metrics/PerceivedComplexity
     # rubocop:enable Metrics/MethodLength
 
     def self.excon_middleware
