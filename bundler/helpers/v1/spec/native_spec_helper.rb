@@ -4,9 +4,6 @@ require "rspec/its"
 require "webmock/rspec"
 require "byebug"
 
-$LOAD_PATH.unshift(File.expand_path("../lib/", __dir__))
-$LOAD_PATH.unshift(File.expand_path("../monkey_patches/", __dir__))
-
 # Bundler monkey patches
 require "definition_ruby_version_patch"
 require "definition_bundler_version_patch"
